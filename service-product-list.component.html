@@ -1,0 +1,163 @@
+<app-microservice-product-view
+[id]="id"
+*ngIf="products && productView"
+(view)="viewClass=$event"
+></app-microservice-product-view>
+<section id="product-list" class="product-list">
+  <h1 class="product-list__header"
+  *ngIf="header"
+  >{{ header }}</h1>
+  <div class="product-list__items"
+  *ngIf="products"
+  [ngClass]="viewClass"
+  >
+    <article class="product-list__item"
+    *ngFor="let product of products; trackBy: trackByFn"
+    [ngClass]="viewClass"
+    >
+      <a class="item__additional-content" [routerLink]="['/personal-page/', changeName(product.name)]">
+        <div style="background-image: url(//graph.digiseller.ru/img.ashx?id_d={{ product.id }});" class="additional-content__image"
+        *ngIf="id !== 'discounts' && id !== 'recommendations'"
+        ></div>
+        <div style="background-image: url(//graph.digiseller.ru/img.ashx?id_d={{ product.id }});" class="additional-content__image"
+        *ngIf="id === 'discounts' || id === 'recommendations'"
+        ></div>
+        <div class="additional-content__group group__out-of-stock"
+        *ngIf="product.is_available == 0"
+        >
+          <tui-svg src="tuiIconClose" class="additional-content__badge badge__in-stock"></tui-svg>
+          <small class="badge__info">Нет в наличии</small>
+        </div>
+      </a>
+      <div class="item__main-content"
+      [style.background-color]="product?.dominant_color"
+      >
+        <a class="main-content__row" [routerLink]="['/personal-page/', changeName(product.name)]">
+          <h2 class="main-content__name"
+          [tuiHint]="product.name"
+          >{{ product.name }}</h2>
+        </a>
+        <a class="main-content__description" [routerLink]="['/personal-page/', changeName(product.name)]"
+        [tuiHint]="setInfoSplit(product.info)"
+        >{{ setInfoSplit(product.info) }}</a>
+        <div class="main-content__option" *ngIf="cart && product.options">
+          <article class="option__item" *ngFor="let option of product.options" [ngClass]="{ '_hide': option.type !== 'select' && option.type !== 'checkbox' }">
+            <button class="option__select"
+            tuiDropdownHover
+            [tuiDropdown]="dropdownVariants"
+            id="option-select-{{ option.id }}"
+            >
+            {{ option.name[1].value }}:
+            <ng-template #dropdownVariants>
+              <div class="option__variants" [ngClass]="{ '_hide': option.type !== 'select' && option.type !== 'checkbox' }">
+                <button class="option__button"
+                *ngFor="let variant of option.variants"
+                (click)="onSelectOption(product, option.id, variant.variant_id, variant.name[1].value + ' ' + '(+₽' + variant.rate + ')')"
+                >{{ variant.name[1].value }} (+₽{{ variant.rate }})</button>
+              </div>
+            </ng-template>
+            <tui-svg src="tuiIconChevronDownLarge" class="option__icon"></tui-svg>
+            </button>
+          </article>
+        </div>
+        <tui-loader class="aui-loader" *ngIf="cart && !product.options"></tui-loader>
+        <div class="main-content__row">
+          <div class="main-content__action" *ngIf="!cart">
+            <form id="digiselller_form" action="https://oplata.info/asp2/pay.asp" method="post" target="_blank">
+              <input type="hidden" name="id_d" value="{{ product.id }}" />
+              <a class="action"
+              *ngIf="product.is_available == 0"
+              (click)="onNotify()"
+              tuiHint="Сообщить о поступлении"
+              ><tui-svg src="tuiIconBell"></tui-svg></a>
+            </form>
+            <button class="action"
+            *ngIf="product.is_available == 1 && !isCart(product.id)"
+            (click)="action('cart', product.id)"
+            [disabled]="product.rent && rating"
+            tuiHint="Добавить в корзину"
+            ><tui-svg src="tuiIconShoppingCart"></tui-svg></button>
+            <button class="action"
+            *ngIf="isCart(product.id)"
+            (click)="action('cart-remove', product.id)"
+            ><tui-svg src="tuiIconMinusCircle"></tui-svg></button>
+            <button class="action" (click)="action('favorite', product.id)" *ngIf="!isFavorite(product.id)"
+            tuiHint="Добавить в избранное"
+            ><tui-svg src="tuiIconHeart"></tui-svg></button>
+            <button class="action" (click)="action('favorite-remove', product.id)" *ngIf="isFavorite(product.id)"
+            tuiHint="Удалить из избранных"
+            ><tui-svg src="tuiIconMinusCircle"></tui-svg></button>
+          </div>
+          <div class="main-content__action" *ngIf="cart">
+            <tui-input-number
+            class="b-form action__count-input"
+            [tuiTextfieldSize]="'m'"
+            [step]="1"
+            [decimal]="'never'"
+            [min]="1"
+            [max]="100"
+            (input)="setCount(product.id, $event)"
+            >
+            Кол-во
+            </tui-input-number>
+            <button class="action"
+            *ngIf="isCart(product.id)"
+            (click)="action('cart-remove', product.id)"
+            tuiHint="Удалить из корзины"
+            ><tui-svg src="tuiIconMinusCircle"></tui-svg></button>
+          </div>
+          <div class="main-content__prices">
+            <p class="main-content__price"
+            *ngIf="data.currency == 'RUR'"
+            >₽{{ product.price_rub }}</p>
+            <p class="main-content__price"
+            *ngIf="data.currency == 'USD'"
+            >${{ product.price_usd }}</p>
+            <p class="main-content__price"
+            *ngIf="data.currency == 'EUR'"
+            >€{{ product.price_eur }}</p>
+            <p class="main-content__price"
+            *ngIf="data.currency == 'UAH'"
+            >₴{{ product.price_uah }}</p>
+            <p class="main-content__price _steam" *ngIf="product?.price_steam"
+            tuiHint="Цена в Steam"
+            >₽{{ product.price_steam }}</p>
+          </div>
+        </div>
+      </div>
+    </article>
+  </div>
+  <button class="product-list__more" *ngIf="isMobile && (currentPage != totalPages) && isAnyPages" (click)="++currentPage; data.page = currentPage.toString(); onLoaded = false; load();">Загрузить еще</button>
+  <tui-loader *ngIf="!onLoaded" class="aui-loader"></tui-loader>
+  <div class="product-list__empty"
+  *ngIf="(!products || products.length == 0) && onLoaded"
+  >
+    <p class="empty__content">В этой категории отсутствуют товары или что-то пошло не так :/</p>
+    <p class="empty__content">Вернуться <a class="empty__link" routerLink="/">Домой</a></p>
+  </div>
+</section>
+<section class="pages" id="pages">
+  <ul class="pages__list" *ngIf="isAnyPages && !isMobile">
+    <li class="pages__item" *ngIf="currentPage != 1 && products"><a (click)="selectedPage(currentPage - 1)"><tui-svg src="tuiIconChevronLeft"></tui-svg></a></li>
+    <li class="pages__item"
+    *ngIf="currentPage >= 4"
+    ><a (click)="selectedPage(1)">1</a></li>
+    <li class="pages__item"
+    *ngIf="currentPage >= 4"
+    ><a class="disabled">..</a></li>
+    <li class="pages__item"
+    *ngFor="let page of pages; index as i"
+    [ngClass]="{ 'hidden': i > 4 }"
+    ><a 
+    [ngClass]="{ 'selected': page == currentPage }"
+    (click)="selectedPage(page)"
+    >{{ page }}</a></li>
+    <li class="pages__item"
+    *ngIf="currentPage + 2 < pages[pages.length - 1] && (pages.length - 1) > 4"
+    ><a class="disabled">..</a></li>
+    <li class="pages__item"
+    *ngIf="currentPage + 2 < pages[pages.length - 1] && (pages.length - 1) > 4"
+    ><a (click)="selectedPage(totalPages)">{{ totalPages }}</a></li>
+    <li class="pages__item" *ngIf="currentPage != pages[pages.length - 1] && products"><a (click)="selectedPage(currentPage + 1)"><tui-svg src="tuiIconChevronRight"></tui-svg></a></li>
+  </ul>
+</section>
